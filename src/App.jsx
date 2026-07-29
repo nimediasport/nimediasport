@@ -236,7 +236,7 @@ export default function App() {
           .header-nav-center { display: none !important; }
           .croco-mobile-btn { display: inline-flex !important; }
           .news-layout { flex-direction: column !important; }
-          .news-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 2px !important; }
+          .news-grid { grid-template-columns: repeat(1, 1fr) !important; gap: 4px !important; }
           .hashtag-sidebar { display: none !important; }
           .hashtag-mobile { display: flex !important; }
           .post-modal-inner { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; }
@@ -1202,7 +1202,7 @@ function CrocoProno({ isAdmin }) {
           {!currentUser && <PronoLogin onLogin={handleLogin} />}
           {matches.length === 0 && <div className="oswald" style={{ color: "#8A8375", textAlign: "center", padding: 40 }}>Aucun match à pronostiquer pour l'instant.</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {matches.map(match => {
+            {[...matches].sort((a, b) => new Date(a.date) - new Date(b.date)).map(match => {
               const pronoKey = currentUser ? `${match.id}__${currentUser.key}` : null;
               const myProno = pronoKey ? pronos[pronoKey] : null;
               const closed = isClosed(match);
