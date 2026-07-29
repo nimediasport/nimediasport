@@ -413,9 +413,12 @@ function GridThumb({ article, onOpen }) {
           <ImageOff size={22} color={RED} />
         </div>
       )}
-      {/* Hashtag en overlay en bas de l'image */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.65))", padding: "24px 10px 8px" }}>
-        <span className="oswald" style={{ color: WHITE, fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>{hashtag}</span>
+      {/* Hashtag + titre en overlay en bas de l'image */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.75))", padding: "28px 10px 8px" }}>
+        {article.title && (
+          <div className="oswald" style={{ color: WHITE, fontSize: 13, fontWeight: 700, lineHeight: 1.2, marginBottom: 3 }}>{article.title}</div>
+        )}
+        <span className="mono" style={{ color: "rgba(255,255,255,0.8)", fontSize: 11 }}>{hashtag}</span>
       </div>
     </div>
   );
@@ -515,6 +518,9 @@ function PostModal({ article, onClose, eng, liked, onLike, onComment, isAdmin, o
 
           {/* Contenu texte */}
           <div style={{ padding: "6px 14px 16px" }}>
+            {article.title && (
+              <div className="oswald" style={{ fontSize: 17, fontWeight: 700, color: INK, marginBottom: 6, lineHeight: 1.25 }}>{article.title}</div>
+            )}
           <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px", color: INK }}>
             {article.content || article.excerpt}
           </p>
@@ -629,7 +635,7 @@ function CommunitySubmitForm({ onSubmit, onClose }) {
             <input style={inputStyle} value={hashtag} onChange={e => setHashtag(e.target.value)} placeholder="#NimesOlympique" />
           </div>
           <div>
-            <label style={labelStyle}>Texte</label>
+            <label style={labelStyle}>Texte (obligatoire)</label>
             <textarea style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} value={excerpt} onChange={e => setExcerpt(e.target.value)} placeholder="Décrivez votre actualité en quelques phrases…" />
           </div>
           {error && <div className="oswald" style={{ color: RED, fontSize: 12 }}>{error}</div>}
@@ -645,6 +651,7 @@ function CommunitySubmitForm({ onSubmit, onClose }) {
 function EditModal({ article, onSave, onClose }) {
   const [image, setImage] = useState(article.image || "");
   const [imageLoading, setImageLoading] = useState(false);
+  const [artTitle, setArtTitle] = useState(article.title || "");
   const [excerpt, setExcerpt] = useState(article.excerpt || "");
   const [content, setContent] = useState(article.content || "");
   const [hashtag, setHashtag] = useState(article.hashtag || DEFAULT_HASHTAG);
@@ -687,14 +694,14 @@ function EditModal({ article, onSave, onClose }) {
             <input style={inputStyle} value={hashtag} onChange={e => setHashtag(e.target.value)} />
           </div>
           <div>
-            <label style={labelStyle}>Texte</label>
-            <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={excerpt} onChange={e => setExcerpt(e.target.value)} />
+            <label style={labelStyle}>Titre (optionnel)</label>
+            <input style={inputStyle} value={artTitle} onChange={e => setArtTitle(e.target.value)} />
           </div>
           <div>
-            <label style={labelStyle}>Texte complémentaire</label>
+            <label style={labelStyle}>Texte (obligatoire)</label>
             <textarea style={{ ...inputStyle, minHeight: 100, resize: "vertical" }} value={content} onChange={e => setContent(e.target.value)} />
           </div>
-          <button onClick={() => onSave({ image, excerpt, content: content || excerpt, hashtag: (hashtag.startsWith("#") ? hashtag : "#"+hashtag).replace(/\s+/g,"") })} className="oswald" style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "11px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
+          <button onClick={() => onSave({ image, title: artTitle, excerpt: content || excerpt, content: content || excerpt, hashtag: (hashtag.startsWith("#") ? hashtag : "#"+hashtag).replace(/\s+/g,"") })} className="oswald" style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "11px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
             Enregistrer les modifications
           </button>
         </div>
@@ -720,6 +727,7 @@ function EmptyState({ onGoRedaction }) {
 function Redaction({ onPublish, saving, articles, onDelete, pending, onApprove, onReject, onEdit }) {
   const [image, setImage] = useState("");
   const [imageLoading, setImageLoading] = useState(false);
+  const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState("");
   const [author, setAuthor] = useState("");
@@ -754,7 +762,7 @@ function Redaction({ onPublish, saving, articles, onDelete, pending, onApprove, 
 Brief : """${brief.trim()}"""
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte autour, au format exact :
-{"excerpt": "légende du post, 2 à 3 phrases, ton dynamique et chaleureux", "content": "texte complémentaire un peu plus détaillé si pertinent, sinon identique à excerpt", "hashtag": "#UnHashtagEnCamelCase qui résume le sujet"}`,
+{"title": "titre court et accrocheur (optionnel)", "content": "texte principal du post, 2 à 3 phrases, ton dynamique et chaleureux", "hashtag": "#UnHashtagEnCamelCase qui résume le sujet"}`,
             },
           ],
         }),
@@ -764,8 +772,8 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte
       if (!textBlock) throw new Error("Réponse vide");
       const clean = textBlock.text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
-      setExcerpt(parsed.excerpt || "");
-      setContent(parsed.content || parsed.excerpt || "");
+      setTitle(parsed.title || "");
+      setContent(parsed.content || "");
       let tag = (parsed.hashtag || "").trim();
       if (tag && !tag.startsWith("#")) tag = `#${tag}`;
       if (tag) setHashtag(tag.replace(/\s+/g, ""));
@@ -778,8 +786,8 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte
   };
 
   const submit = async () => {
-    if (!image || !excerpt.trim()) {
-      setError("L'image et le texte sont obligatoires — comme pour un post Instagram.");
+    if (!image || !content.trim()) {
+      setError("L'image et le texte sont obligatoires.");
       return;
     }
     setError("");
@@ -788,12 +796,13 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte
     tag = tag.replace(/\s+/g, "");
     await onPublish({
       image: image,
-      excerpt: excerpt.trim(),
-      content: content.trim() || excerpt.trim(),
+      title: title.trim(),
+      excerpt: content.trim(),
+      content: content.trim(),
       author: author.trim(),
       hashtag: tag,
     });
-    setImage(""); setExcerpt(""); setContent(""); setAuthor("");
+    setImage(""); setTitle(""); setExcerpt(""); setContent(""); setAuthor("");
     setHashtag(DEFAULT_HASHTAG);
     setBrief(""); setAiFilled(false);
   };
@@ -878,12 +887,12 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte
           <input style={inputStyle} value={hashtag} onChange={(e) => setHashtag(e.target.value)} placeholder="#NimesOlympique" />
         </div>
         <div>
-          <label style={labelStyle}>Texte</label>
-          <textarea style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} placeholder="Le texte qui accompagne la photo." />
+          <label style={labelStyle}>Titre (optionnel)</label>
+          <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. Victoire éclatante aux Costières !" />
         </div>
         <div>
-          <label style={labelStyle}>Texte complémentaire (optionnel, affiché en détail)</label>
-          <textarea style={{ ...inputStyle, minHeight: 140, resize: "vertical" }} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Des détails supplémentaires si besoin, affichés quand on ouvre le post." />
+          <label style={labelStyle}>Texte (obligatoire)</label>
+          <textarea style={{ ...inputStyle, minHeight: 140, resize: "vertical" }} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Le texte de la publication." />
         </div>
         <div>
           <label style={labelStyle}>Auteur (optionnel)</label>
