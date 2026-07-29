@@ -225,26 +225,35 @@ export default function App() {
       </div>
 
       <header style={{ background: INK, color: WHITE, position: "sticky", top: 0, zIndex: 20, borderBottom: `3px solid ${GREEN}` }}>
-        <div style={{ maxWidth: 620, margin: "0 auto", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <button onClick={() => { setView("public"); setOpenArticle(null); }} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 12, padding: 0 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+          {/* Logo + titre */}
+          <button onClick={() => { setView("public"); setOpenArticle(null); }} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 12, padding: 0, flexShrink: 0 }}>
             <Logo size={44} />
             <div style={{ textAlign: "left" }}>
               <div className="bebas" style={{ fontSize: 26, lineHeight: 1, color: WHITE }}>
                 NÎ<span style={{ color: RED }}>MEDIA</span>SPORT
               </div>
-              <div className="mono" style={{ fontSize: 9.5, color: "#C9A6AC", letterSpacing: 0.8, marginTop: 3, maxWidth: 260 }}>{SLOGAN}</div>
+              <div className="mono" style={{ fontSize: 9.5, color: "#C9A6AC", letterSpacing: 0.8, marginTop: 3 }}>{SLOGAN}</div>
             </div>
           </button>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button onClick={() => setShowSubmit(true)} className="oswald"
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${WHITE}`, color: WHITE, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "7px 13px", borderRadius: 3 }}>
-              <PenSquare size={13} /> Proposer un article
+
+          {/* Navigation centrée */}
+          <nav style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "center", flex: 1 }}>
+            <button onClick={() => { setView("public"); setOpenArticle(null); }} className="oswald"
+              style={{ background: "none", border: "none", color: view === "public" ? WHITE : "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer", padding: "6px 0", borderBottom: view === "public" ? `2px solid ${RED}` : "2px solid transparent" }}>
+              Actualités
             </button>
             <button onClick={() => setView(view === "crocoprono" ? "public" : "crocoprono")} className="oswald"
-              style={{ display: "flex", alignItems: "center", gap: 6, background: view === "crocoprono" ? GREEN : "transparent", border: `1px solid ${GREEN}`, color: WHITE, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "7px 13px", borderRadius: 3 }}>
-              🐊 Crocoprono
+              style={{ background: "none", border: "none", color: view === "crocoprono" ? WHITE : "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer", padding: "6px 0", borderBottom: view === "crocoprono" ? `2px solid ${GREEN}` : "2px solid transparent", whiteSpace: "nowrap" }}>
+              🐊&nbsp;Crocoprono
             </button>
-          </div>
+          </nav>
+
+          {/* Action droite */}
+          <button onClick={() => setShowSubmit(true)} className="oswald"
+            style={{ display: "flex", alignItems: "center", gap: 6, background: RED, border: "none", color: WHITE, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "8px 16px", borderRadius: 3, flexShrink: 0, cursor: "pointer" }}>
+            <PenSquare size={13} /> Proposer
+          </button>
         </div>
       </header>
 
