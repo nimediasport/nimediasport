@@ -34,6 +34,16 @@ const DEFAULT_HASHTAG = "#SportNimois";
 
 const SLOGAN = "La communauté officielle des passionnés du sport Nîmois";
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 680);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 680);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 function formatDate(iso) {
   try {
     return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -55,6 +65,7 @@ function Logo({ size = 44 }) {
 }
 
 export default function App() {
+  const isMobile = useIsMobile();
   const [articles, setArticles] = useState([]);
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +227,19 @@ export default function App() {
         input:focus, textarea:focus, select:focus { outline: 2px solid ${RED}; outline-offset: 1px; }
         @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
         @media (prefers-reduced-motion: reduce) { .card, .navbtn { transition: none; } }
+
+        /* ── RESPONSIVE MOBILE ── */
+        @media (max-width: 680px) {
+          .header-slogan { display: none !important; }
+          .header-nav-center { display: none !important; }
+          .news-layout { flex-direction: column !important; }
+          .news-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .hashtag-sidebar { display: none !important; }
+          .hashtag-mobile { display: flex !important; }
+          .post-modal-inner { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; }
+          .croco-form-grid { grid-template-columns: 1fr !important; }
+          .leaderboard-table th:nth-child(n+5), .leaderboard-table td:nth-child(n+5) { display: none; }
+        }
       `}</style>
 
       <div style={{ height: 5, display: "flex" }}>
@@ -233,12 +257,12 @@ export default function App() {
               <div className="bebas" style={{ fontSize: 26, lineHeight: 1, color: WHITE }}>
                 NÎ<span style={{ color: RED }}>MEDIA</span>SPORT
               </div>
-              <div className="mono" style={{ fontSize: 9.5, color: "#C9A6AC", letterSpacing: 0.8, marginTop: 3 }}>{SLOGAN}</div>
+              <div className="mono header-slogan" style={{ fontSize: 9.5, color: "#C9A6AC", letterSpacing: 0.8, marginTop: 3 }}>{SLOGAN}</div>
             </div>
           </button>
 
           {/* Navigation centrée */}
-          <nav style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "center", flex: 1 }}>
+          <nav className="header-nav-center" style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "center", flex: 1 }}>
             <button onClick={() => { setView("public"); setOpenArticle(null); }} className="oswald"
               style={{ background: "none", border: "none", color: view === "public" ? WHITE : "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer", padding: "6px 0", borderBottom: view === "public" ? `2px solid ${RED}` : "2px solid transparent" }}>
               Actualités
@@ -249,11 +273,18 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Action droite */}
-          <button onClick={() => setShowSubmit(true)} className="oswald"
-            style={{ display: "flex", alignItems: "center", gap: 6, background: RED, border: "none", color: WHITE, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "8px 16px", borderRadius: 3, flexShrink: 0, cursor: "pointer" }}>
-            <PenSquare size={13} /> Proposer
-          </button>
+          {/* Actions droite */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {/* Crocoprono visible sur mobile */}
+            <button onClick={() => setView(view === "crocoprono" ? "public" : "crocoprono")} className="oswald"
+              style={{ display: "none", background: "none", border: "none", color: view === "crocoprono" ? GREEN : "rgba(255,255,255,0.6)", fontSize: 20, cursor: "pointer", padding: "4px" }}>
+              🐊
+            </button>
+            <button onClick={() => setShowSubmit(true)} className="oswald"
+              style={{ display: "flex", alignItems: "center", gap: 6, background: RED, border: "none", color: WHITE, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "8px 16px", borderRadius: 3, cursor: "pointer" }}>
+              <PenSquare size={13} /> <span className="header-slogan">Proposer</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -313,10 +344,24 @@ export default function App() {
             </div>
 
             {/* Layout : grille + sidebar */}
-            <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginTop: 4 }}>
+            <div className="news-layout" style={{ display: "flex", gap: 20, alignItems: "flex-start", marginTop: 4 }}>
 
               {/* Grille articles */}
               <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Barre hashtag horizontale sur mobile */}
+                <div className="hashtag-mobile" style={{ display: "none", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 8, flexWrap: "nowrap" }}>
+                  <button onClick={() => setActiveTag(null)} className="oswald"
+                    style={{ background: !activeTag ? RED : "#F0EBE3", color: !activeTag ? WHITE : INK, border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    Tout
+                  </button>
+                  {[...new Set(articles.map(a => a.hashtag || DEFAULT_HASHTAG))].map(tag => (
+                    <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className="oswald"
+                      style={{ background: activeTag === tag ? RED : "#F0EBE3", color: activeTag === tag ? WHITE : INK, border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+
                 {articles.length === 0 ? (
                   <div style={{ padding: "20px" }}><EmptyState onGoRedaction={() => setView("redaction")} /></div>
                 ) : (() => {
@@ -326,7 +371,7 @@ export default function App() {
                       Aucun article pour ce hashtag.
                     </div>
                   ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+                    <div className="news-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
                       {filtered.map((a) => (
                         <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} />
                       ))}
@@ -399,7 +444,7 @@ function HashtagSidebar({ articles, activeTag, onSelect }) {
   const tags = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
   return (
-    <div style={{ width: 170, flexShrink: 0, position: "sticky", top: 80 }}>
+    <div className="hashtag-sidebar" style={{ width: 170, flexShrink: 0, position: "sticky", top: 80 }}>
       <div className="oswald" style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#8A8375", padding: "12px 0 8px", borderBottom: `2px solid ${INK}`, marginBottom: 8 }}>
         Catégories
       </div>
@@ -489,7 +534,7 @@ function PostModal({ article, onClose, eng, liked, onLike, onComment, isAdmin, o
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: WHITE, borderRadius: 10, overflow: "hidden", width: "100%", maxWidth: 480, maxHeight: "94vh", display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} className="post-modal-inner" style={{ background: WHITE, borderRadius: 10, overflow: "hidden", width: "100%", maxWidth: 480, maxHeight: "94vh", display: "flex", flexDirection: "column" }}>
 
         {/* En-tête fixe */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid #EAD9DB", flexShrink: 0 }}>
@@ -1163,7 +1208,7 @@ function CrocoProno({ isAdmin }) {
           {leaderboard.length === 0 ? (
             <div className="oswald" style={{ color: "#8A8375", textAlign: "center", padding: 40 }}>Aucun point marqué pour l'instant.</div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <table className="leaderboard-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${INK}` }}>
                   {["#","Pseudo","Points","Matchs","Exact","Résultat"].map(h => (
@@ -1330,7 +1375,7 @@ function AdminCroco({ matches, pronos, onAddMatch, onSetScore, onDeleteMatch }) 
       {/* Ajouter un match */}
       <div style={{ background: "#F8F4EF", border: "1px solid #E7E3D8", borderLeft: `4px solid ${GREEN}`, borderRadius: 6, padding: "18px", marginBottom: 24 }}>
         <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Ajouter un match</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+        <div className="croco-form-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
           <div>
             <label style={labelS}>Club</label>
             <select style={{ ...inputS, width: "100%" }} value={form.club} onChange={e => setForm(f => ({ ...f, club: e.target.value }))}>
