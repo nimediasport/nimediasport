@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { storage } from "./supabase";
-import { PenSquare, Trash2, Calendar, User, ChevronRight, Loader2, Heart, MessageCircle, Send, Bookmark, ImageOff, Sparkles, Mail } from "lucide-react";
+import { PenSquare, Trash2, Calendar, User, ChevronRight, Loader2, Heart, MessageCircle, Send, Bookmark, ImageOff, Sparkles, Mail, Lock } from "lucide-react";
 
 const FONT_LINK_ID = "nimediasport-fonts";
 
@@ -26,6 +26,9 @@ const LOGO_SRC = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQ
 const STORAGE_KEY = "nimediasport-articles";
 const PENDING_KEY  = "nimediasport-pending";
 const ADMIN_PASS   = "NMSport26";
+const MATCHES_KEY  = "crocoprono-matches";
+const USERS_KEY    = "crocoprono-users";
+const PRONOS_KEY   = "crocoprono-pronostics";
 
 const DEFAULT_HASHTAG = "#SportNimois";
 
@@ -55,7 +58,7 @@ export default function App() {
   const [articles, setArticles] = useState([]);
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("public");
+  const [view, setView] = useState("public"); // public | redaction | crocoprono
   const [openArticle, setOpenArticle] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -234,12 +237,12 @@ export default function App() {
           </button>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button onClick={() => setShowSubmit(true)} className="oswald"
-              style={{ display: "flex", alignItems: "center", gap: 6, background: GREEN, border: `1px solid ${GREEN}`, color: WHITE, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "7px 13px", borderRadius: 3 }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${WHITE}`, color: WHITE, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "7px 13px", borderRadius: 3 }}>
               <PenSquare size={13} /> Proposer un article
             </button>
-            <button onClick={() => { if (isAdmin) { setView(view === "redaction" ? "public" : "redaction"); } else { setShowLogin(true); } }} className="oswald"
-              style={{ display: "flex", alignItems: "center", gap: 6, background: view === "redaction" && isAdmin ? RED : "transparent", border: `1px solid ${RED}`, color: WHITE, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "7px 13px", borderRadius: 3 }}>
-              Admin {pending.length > 0 && isAdmin && <span style={{ background: RED, color: WHITE, borderRadius: "50%", fontSize: 10, padding: "0 5px", marginLeft: 4 }}>{pending.length}</span>}
+            <button onClick={() => setView(view === "crocoprono" ? "public" : "crocoprono")} className="oswald"
+              style={{ display: "flex", alignItems: "center", gap: 6, background: view === "crocoprono" ? GREEN : "transparent", border: `1px solid ${GREEN}`, color: WHITE, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, padding: "7px 13px", borderRadius: 3 }}>
+              🐊 Crocoprono
             </button>
           </div>
         </div>
@@ -282,6 +285,10 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", padding: "80px 0", color: "#8A8375" }}>
             <Loader2 className="mono" size={18} style={{ animation: "spin 1s linear infinite" }} />
             Chargement…
+          </div>
+        ) : view === "crocoprono" ? (
+          <div style={{ padding: "24px 20px" }}>
+            <CrocoProno isAdmin={isAdmin} />
           </div>
         ) : view === "redaction" ? (
           <div style={{ padding: "24px 20px" }}>
@@ -359,6 +366,14 @@ export default function App() {
             <Mail size={15} />
             <span style={{ fontSize: 11, letterSpacing: 0.5 }}>nimes.mediasport@gmail.com</span>
           </a>
+          <button onClick={() => { if (isAdmin) { setView(view === "redaction" ? "public" : "redaction"); } else { setShowLogin(true); } }}
+            title="Administration"
+            style={{ background: "none", border: "none", color: view === "redaction" && isAdmin ? RED : "rgba(255,255,255,0.15)", cursor: "pointer", padding: "2px 4px", display: "flex", alignItems: "center", position: "relative" }}>
+            <Lock size={12} />
+            {pending.length > 0 && isAdmin && (
+              <span style={{ position: "absolute", top: -3, right: -3, background: RED, color: WHITE, borderRadius: "50%", fontSize: 8, width: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Oswald',sans-serif", fontWeight: 700 }}>{pending.length}</span>
+            )}
+          </button>
         </div>
       </footer>
     </div>
@@ -952,6 +967,411 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── CROCOPRONO ───────────────────────────────────────────────────────────────
+
+async function hashCode(pseudo, code) {
+  const text = `${pseudo.toLowerCase().trim()}:${code.trim()}:crocoprono`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function calcPoints(ph, pa, rh, ra) {
+  if (rh === null || ra === null) return null;
+  if (ph === rh && pa === ra) return 3;
+  const pr = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
+  const rr = rh > ra ? 'H' : rh < ra ? 'A' : 'D';
+  return pr === rr ? 1 : 0;
+}
+
+function isClosed(match) {
+  if (match.status === 'finished') return true;
+  if (match.closingDate && new Date() >= new Date(match.closingDate)) return true;
+  return false;
+}
+
+function CrocoProno({ isAdmin }) {
+  const [tab, setTab] = useState('pronos');
+  const [matches, setMatches] = useState([]);
+  const [users, setUsers] = useState({});
+  const [pronos, setPronos] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState('');
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [m, u, p] = await Promise.all([
+          storage.get(MATCHES_KEY),
+          storage.get(USERS_KEY),
+          storage.get(PRONOS_KEY),
+        ]);
+        setMatches(m ? JSON.parse(m.value) : []);
+        setUsers(u ? JSON.parse(u.value) : {});
+        setPronos(p ? JSON.parse(p.value) : {});
+      } catch { }
+      setLoading(false);
+    })();
+  }, []);
+
+  const saveMatches = async (next) => { setMatches(next); await storage.set(MATCHES_KEY, JSON.stringify(next)); };
+  const saveUsers   = async (next) => { setUsers(next);   await storage.set(USERS_KEY, JSON.stringify(next)); };
+  const savePronos  = async (next) => { setPronos(next);  await storage.set(PRONOS_KEY, JSON.stringify(next)); };
+
+  // Login / Register
+  const handleLogin = async (pseudo, code) => {
+    const key = pseudo.toLowerCase().trim();
+    const hash = await hashCode(pseudo, code);
+    if (users[key]) {
+      if (users[key].codeHash !== hash) { showToast('Code secret incorrect.'); return false; }
+    } else {
+      const nextUsers = { ...users, [key]: { pseudo: pseudo.trim(), codeHash: hash } };
+      await saveUsers(nextUsers);
+    }
+    setCurrentUser({ pseudo: pseudo.trim(), key });
+    showToast(`Bienvenue ${pseudo.trim()} !`);
+    return true;
+  };
+
+  // Sauvegarder un pronostic
+  const saveProno = async (matchId, scoreHome, scoreAway) => {
+    if (!currentUser) return;
+    const pronoKey = `${matchId}__${currentUser.key}`;
+    const match = matches.find(m => m.id === matchId);
+    const pts = match?.status === 'finished' ? calcPoints(scoreHome, scoreAway, match.scoreHome, match.scoreAway) : null;
+    const next = { ...pronos, [pronoKey]: { pseudo: currentUser.pseudo, matchId, scoreHome, scoreAway, points: pts, updatedAt: new Date().toISOString() } };
+    await savePronos(next);
+    showToast('Pronostic enregistré !');
+  };
+
+  // Admin : ajouter un match
+  const addMatch = async (match) => {
+    const next = [{ ...match, id: `m_${Date.now()}`, status: 'open', scoreHome: null, scoreAway: null }, ...matches];
+    await saveMatches(next);
+    showToast('Match ajouté !');
+  };
+
+  // Admin : saisir le score réel
+  const setScore = async (matchId, scoreHome, scoreAway) => {
+    const updatedMatches = matches.map(m => m.id === matchId ? { ...m, scoreHome, scoreAway, status: 'finished' } : m);
+    // Recalculer les points de tous les pronostics de ce match
+    const updatedPronos = { ...pronos };
+    Object.keys(updatedPronos).forEach(k => {
+      if (updatedPronos[k].matchId === matchId) {
+        updatedPronos[k].points = calcPoints(updatedPronos[k].scoreHome, updatedPronos[k].scoreAway, scoreHome, scoreAway);
+      }
+    });
+    await saveMatches(updatedMatches);
+    await savePronos(updatedPronos);
+    showToast('Score enregistré et points calculés !');
+  };
+
+  // Calcul du leaderboard
+  const leaderboard = (() => {
+    const scores = {};
+    Object.values(pronos).forEach(p => {
+      const match = matches.find(m => m.id === p.matchId);
+      if (!match || match.status !== 'finished') return;
+      if (!scores[p.pseudo]) scores[p.pseudo] = { pseudo: p.pseudo, points: 0, played: 0, exact: 0, correct: 0 };
+      scores[p.pseudo].played++;
+      scores[p.pseudo].points += p.points || 0;
+      if (p.points === 3) scores[p.pseudo].exact++;
+      if (p.points === 1) scores[p.pseudo].correct++;
+    });
+    return Object.values(scores).sort((a, b) => b.points - a.points || b.exact - a.exact);
+  })();
+
+
+  const inputS = { border: "1px solid #D8D2C2", borderRadius: 4, padding: "8px 10px", fontSize: 14, fontFamily: "'Source Serif 4', serif", color: INK, background: WHITE };
+  const labelS = { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, color: "#4A453C", marginBottom: 4, display: "block" };
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: "#8A8375" }}>Chargement…</div>;
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto" }}>
+      {toast && <div style={{ position: "fixed", top: 78, right: 20, zIndex: 300, background: INK, color: WHITE, padding: "10px 16px", borderRadius: 4, fontSize: 13, fontFamily: "'Oswald',sans-serif" }}>{toast}</div>}
+
+      {/* Titre */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20, borderBottom: `2px solid ${GREEN}`, paddingBottom: 10 }}>
+        <span style={{ fontSize: 32 }}>🐊</span>
+        <div>
+          <div className="bebas" style={{ fontSize: 28, lineHeight: 1 }}>Crocoprono</div>
+          <div className="mono" style={{ fontSize: 11, color: "#8A8375" }}>Pronostique les matchs du NO et de l'USAM</div>
+        </div>
+        {currentUser && <div className="oswald" style={{ marginLeft: "auto", fontSize: 13, color: GREEN, fontWeight: 700 }}>🟢 {currentUser.pseudo}</div>}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid #E7E3D8" }}>
+        {[["pronos","Pronostics"],["classement","Classement"]].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t)} className="oswald"
+            style={{ background: "none", border: "none", borderBottom: tab === t ? `3px solid ${RED}` : "3px solid transparent", color: tab === t ? RED : "#6B6456", fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "8px 16px", cursor: "pointer" }}>
+            {l}
+          </button>
+        ))}
+
+      </div>
+
+      {/* ONGLET PRONOSTICS */}
+      {tab === 'pronos' && (
+        <div>
+          {!currentUser && <PronoLogin onLogin={handleLogin} />}
+          {matches.length === 0 && <div className="oswald" style={{ color: "#8A8375", textAlign: "center", padding: 40 }}>Aucun match à pronostiquer pour l'instant.</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {matches.map(match => {
+              const pronoKey = currentUser ? `${match.id}__${currentUser.key}` : null;
+              const myProno = pronoKey ? pronos[pronoKey] : null;
+              const closed = isClosed(match);
+              return <MatchCard key={match.id} match={match} myProno={myProno} closed={closed} currentUser={currentUser} onSave={(h, a) => saveProno(match.id, h, a)} />;
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ONGLET CLASSEMENT */}
+      {tab === 'classement' && (
+        <div>
+          {leaderboard.length === 0 ? (
+            <div className="oswald" style={{ color: "#8A8375", textAlign: "center", padding: 40 }}>Aucun point marqué pour l'instant.</div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${INK}` }}>
+                  {["#","Pseudo","Points","Matchs","Exact","Résultat"].map(h => (
+                    <th key={h} className="oswald" style={{ textAlign: h === "Pseudo" ? "left" : "center", padding: "8px 10px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#4A453C" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((row, i) => (
+                  <tr key={row.pseudo} style={{ borderBottom: "1px solid #F0EBE3", background: i === 0 ? "#FFF8E7" : i < 3 ? "#FAFAFA" : WHITE }}>
+                    <td className="oswald" style={{ textAlign: "center", padding: "10px", fontWeight: 700, fontSize: 15, color: i === 0 ? "#B8860B" : i === 1 ? "#808080" : i === 2 ? "#8B4513" : INK }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</td>
+                    <td className="oswald" style={{ padding: "10px", fontWeight: 600 }}>{row.pseudo}</td>
+                    <td className="oswald" style={{ textAlign: "center", padding: "10px", fontWeight: 700, fontSize: 16, color: RED }}>{row.points}</td>
+                    <td style={{ textAlign: "center", padding: "10px", color: "#6B6456" }}>{row.played}</td>
+                    <td style={{ textAlign: "center", padding: "10px" }}>🎯 {row.exact}</td>
+                    <td style={{ textAlign: "center", padding: "10px" }}>✓ {row.correct}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 16, textAlign: "center" }}>
+            🎯 Score exact = 3pts &nbsp;|&nbsp; ✓ Bon résultat = 1pt
+          </div>
+        </div>
+      )}
+
+      {/* ONGLET ADMIN */}
+      {tab === 'admin' && isAdmin && <AdminCroco matches={matches} pronos={pronos} onAddMatch={addMatch} onSetScore={setScore} />}
+
+      {/* Lien admin discret en bas de page */}
+      {isAdmin && (
+        <div style={{ marginTop: 40, textAlign: "center" }}>
+          <button onClick={() => setTab(tab === 'admin' ? 'pronos' : 'admin')} className="mono"
+            style={{ background: "none", border: "none", color: "#C9C2B2", fontSize: 11, cursor: "pointer", letterSpacing: 0.5 }}>
+            {tab === 'admin' ? "← Retour" : "⚙"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PronoLogin({ onLogin }) {
+  const [pseudo, setPseudo] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const inputS = { width: "100%", border: "1px solid #D8D2C2", borderRadius: 4, padding: "9px 12px", fontSize: 14, fontFamily: "'Source Serif 4', serif", color: INK };
+  const handleSubmit = async () => {
+    if (!pseudo.trim() || !code.trim()) return;
+    setLoading(true);
+    await onLogin(pseudo, code);
+    setLoading(false);
+  };
+  return (
+    <div style={{ background: "#F8F4EF", border: "1px solid #E7E3D8", borderLeft: `4px solid ${GREEN}`, borderRadius: 6, padding: "20px", marginBottom: 24 }}>
+      <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Connexion / Inscription</div>
+      <p style={{ fontSize: 13, color: "#6B6456", marginBottom: 14 }}>Choisis un pseudo et un code secret pour participer. Si c'est ta première fois, ton compte est créé automatiquement.</p>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input style={{ ...inputS, flex: 1, minWidth: 140 }} value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ton pseudo" />
+        <input style={{ ...inputS, flex: 1, minWidth: 140 }} type="password" value={code} onChange={e => setCode(e.target.value)} placeholder="Ton code secret" onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+        <button onClick={handleSubmit} disabled={loading} className="oswald"
+          style={{ background: GREEN, color: WHITE, border: "none", borderRadius: 4, padding: "9px 20px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
+          {loading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Jouer"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MatchCard({ match, myProno, closed, currentUser, onSave }) {
+  const [home, setHome] = useState(myProno?.scoreHome ?? '');
+  const [away, setAway] = useState(myProno?.scoreAway ?? '');
+  const [saving, setSaving] = useState(false);
+  const clubColor = match.club === 'NO' ? GREEN : RED;
+  const pts = myProno?.points;
+
+  useEffect(() => {
+    setHome(myProno?.scoreHome ?? '');
+    setAway(myProno?.scoreAway ?? '');
+  }, [myProno]);
+
+  const handleSave = async () => {
+    if (home === '' || away === '' || !currentUser) return;
+    setSaving(true);
+    await onSave(parseInt(home), parseInt(away));
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ background: WHITE, border: "1px solid #E7E3D8", borderLeft: `4px solid ${clubColor}`, borderRadius: 6, padding: "16px 18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <span className="oswald" style={{ fontSize: 11, background: clubColor, color: WHITE, borderRadius: 3, padding: "2px 8px", marginRight: 8 }}>{match.club}</span>
+          <span className="mono" style={{ fontSize: 11, color: "#8A8375" }}>{match.competition}</span>
+          <div className="oswald" style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
+            {match.club === 'NO' ? 'Nîmes Olympique' : 'USAM Nîmes'} vs {match.adversaire}
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 2 }}>
+            {new Date(match.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+        {/* Score réel si terminé */}
+        {match.status === 'finished' && (
+          <div style={{ textAlign: "center" }}>
+            <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginBottom: 2 }}>Score réel</div>
+            <div className="bebas" style={{ fontSize: 28, color: INK }}>{match.scoreHome} - {match.scoreAway}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Zone pronostic */}
+      <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        {closed ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#8A8375" }}>Ton pronostic :</div>
+            {myProno ? (
+              <>
+                <div className="oswald" style={{ fontSize: 20, fontWeight: 700 }}>{myProno.scoreHome} - {myProno.scoreAway}</div>
+                {pts !== null && (
+                  <div className="oswald" style={{ fontSize: 13, background: pts === 3 ? GREEN : pts === 1 ? "#B8860B" : "#E7E3D8", color: pts > 0 ? WHITE : "#8A8375", padding: "3px 10px", borderRadius: 20, fontWeight: 700 }}>
+                    {pts === 3 ? "🎯 3 pts" : pts === 1 ? "✓ 1 pt" : "0 pt"}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mono" style={{ fontSize: 12, color: "#8A8375", fontStyle: "italic" }}>Pas de pronostic</div>
+            )}
+            <div className="oswald" style={{ fontSize: 11, color: RED }}>🔒 Fermé</div>
+          </div>
+        ) : currentUser ? (
+          <>
+            <div className="mono" style={{ fontSize: 11, color: "#6B6456", whiteSpace: "nowrap" }}>Ton prono :</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="number" min={0} max={20} value={home} onChange={e => setHome(e.target.value)}
+                style={{ width: 48, textAlign: "center", border: "1px solid #D8D2C2", borderRadius: 4, padding: "6px", fontSize: 16, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: INK }} />
+              <span className="oswald" style={{ fontWeight: 700 }}>-</span>
+              <input type="number" min={0} max={20} value={away} onChange={e => setAway(e.target.value)}
+                style={{ width: 48, textAlign: "center", border: "1px solid #D8D2C2", borderRadius: 4, padding: "6px", fontSize: 16, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: INK }} />
+              <button onClick={handleSave} disabled={saving || home === '' || away === ''} className="oswald"
+                style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "7px 14px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", opacity: home === '' || away === '' ? 0.5 : 1 }}>
+                {saving ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> : myProno ? "Modifier" : "Valider"}
+              </button>
+            </div>
+            {myProno && <div className="mono" style={{ fontSize: 11, color: "#8A8375" }}>Actuel : {myProno.scoreHome}-{myProno.scoreAway}</div>}
+          </>
+        ) : (
+          <div className="mono" style={{ fontSize: 12, color: "#8A8375", fontStyle: "italic" }}>Connecte-toi pour pronostiquer</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AdminCroco({ matches, pronos, onAddMatch, onSetScore }) {
+  const [form, setForm] = useState({ club: 'NO', competition: '', adversaire: '', date: '', closingDate: '' });
+  const [scoreForm, setScoreForm] = useState({});
+  const inputS = { border: "1px solid #D8D2C2", borderRadius: 4, padding: "8px 10px", fontSize: 13, fontFamily: "'Source Serif 4', serif", color: INK, background: WHITE };
+
+  const handleAdd = () => {
+    if (!form.adversaire.trim() || !form.date) return;
+    onAddMatch(form);
+    setForm({ club: 'NO', competition: '', adversaire: '', date: '', closingDate: '' });
+  };
+
+  return (
+    <div>
+      {/* Ajouter un match */}
+      <div style={{ background: "#F8F4EF", border: "1px solid #E7E3D8", borderLeft: `4px solid ${GREEN}`, borderRadius: 6, padding: "18px", marginBottom: 24 }}>
+        <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Ajouter un match</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+          <div>
+            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Club</label>
+            <select style={{ ...inputS, width: "100%" }} value={form.club} onChange={e => setForm(f => ({ ...f, club: e.target.value }))}>
+              <option value="NO">Nîmes Olympique</option>
+              <option value="USAM">USAM Nîmes</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Compétition</label>
+            <input style={{ ...inputS, width: "100%" }} value={form.competition} onChange={e => setForm(f => ({ ...f, competition: e.target.value }))} placeholder="Ligue 2, Pro D2…" />
+          </div>
+          <div>
+            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Adversaire</label>
+            <input style={{ ...inputS, width: "100%" }} value={form.adversaire} onChange={e => setForm(f => ({ ...f, adversaire: e.target.value }))} placeholder="Grenoble…" />
+          </div>
+          <div>
+            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Date du match</label>
+            <input type="datetime-local" style={{ ...inputS, width: "100%" }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Fermeture pronos</label>
+            <input type="datetime-local" style={{ ...inputS, width: "100%" }} value={form.closingDate} onChange={e => setForm(f => ({ ...f, closingDate: e.target.value }))} />
+          </div>
+        </div>
+        <button onClick={handleAdd} className="oswald" style={{ marginTop: 14, background: GREEN, color: WHITE, border: "none", borderRadius: 4, padding: "9px 20px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
+          + Ajouter le match
+        </button>
+      </div>
+
+      {/* Saisir les scores */}
+      <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 12 }}>Saisir les scores réels</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {matches.map(m => (
+          <div key={m.id} style={{ background: WHITE, border: "1px solid #E7E3D8", borderRadius: 5, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <span className="oswald" style={{ fontSize: 11, background: m.club === 'NO' ? GREEN : RED, color: WHITE, borderRadius: 3, padding: "2px 6px", marginRight: 6 }}>{m.club}</span>
+              <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>vs {m.adversaire}</span>
+              <span className="mono" style={{ fontSize: 10, color: "#8A8375", marginLeft: 8 }}>{new Date(m.date).toLocaleDateString('fr-FR')}</span>
+            </div>
+            {m.status === 'finished' ? (
+              <div className="oswald" style={{ fontSize: 16, fontWeight: 700, color: GREEN }}>✓ {m.scoreHome} - {m.scoreAway}</div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="number" min={0} max={20} placeholder="D" value={scoreForm[m.id]?.h ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], h: e.target.value } }))}
+                  style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
+                <span className="oswald">-</span>
+                <input type="number" min={0} max={20} placeholder="E" value={scoreForm[m.id]?.a ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], a: e.target.value } }))}
+                  style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
+                <button onClick={() => onSetScore(m.id, parseInt(scoreForm[m.id]?.h || 0), parseInt(scoreForm[m.id]?.a || 0))} className="oswald"
+                  style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Valider
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {matches.length === 0 && <div className="mono" style={{ color: "#8A8375", fontSize: 13 }}>Aucun match ajouté.</div>}
       </div>
     </div>
   );
