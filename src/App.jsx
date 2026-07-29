@@ -236,7 +236,8 @@ export default function App() {
           .header-nav-center { display: none !important; }
           .croco-mobile-btn { display: inline-flex !important; }
           .news-layout { flex-direction: column !important; }
-          .news-grid { grid-template-columns: repeat(1, 1fr) !important; gap: 4px !important; }
+          .news-grid { grid-template-columns: repeat(1, 1fr) !important; gap: 12px !important; padding: 0 12px !important; }
+          .news-grid > * { border-radius: 8px !important; overflow: hidden !important; max-width: 480px !important; margin: 0 auto !important; width: 100% !important; }
           .hashtag-sidebar { display: none !important; }
           .hashtag-mobile { display: flex !important; }
           .post-modal-inner { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; }
