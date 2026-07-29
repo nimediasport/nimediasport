@@ -1069,10 +1069,15 @@ function CrocoProno({ isAdmin }) {
     showToast('Match ajouté !');
   };
 
+  const deleteMatch = async (matchId) => {
+    const next = matches.filter(m => m.id !== matchId);
+    await saveMatches(next);
+    showToast('Match supprimé.');
+  };
+
   // Admin : saisir le score réel
   const setScore = async (matchId, scoreHome, scoreAway) => {
     const updatedMatches = matches.map(m => m.id === matchId ? { ...m, scoreHome, scoreAway, status: 'finished' } : m);
-    // Recalculer les points de tous les pronostics de ce match
     const updatedPronos = { ...pronos };
     Object.keys(updatedPronos).forEach(k => {
       if (updatedPronos[k].matchId === matchId) {
@@ -1117,6 +1122,12 @@ function CrocoProno({ isAdmin }) {
           <div className="mono" style={{ fontSize: 11, color: "#8A8375" }}>Pronostique les matchs du NO et de l'USAM</div>
         </div>
         {currentUser && <div className="oswald" style={{ marginLeft: "auto", fontSize: 13, color: GREEN, fontWeight: 700 }}>🟢 {currentUser.pseudo}</div>}
+        {isAdmin && (
+          <button onClick={() => setTab(tab === 'admin' ? 'pronos' : 'admin')} className="oswald"
+            style={{ marginLeft: currentUser ? 8 : "auto", background: tab === 'admin' ? RED : "transparent", border: `1px solid ${RED}`, color: tab === 'admin' ? WHITE : RED, fontSize: 11, fontWeight: 700, textTransform: "uppercase", padding: "5px 10px", borderRadius: 3, cursor: "pointer" }}>
+            {tab === 'admin' ? "← Retour" : "⚙ Gérer"}
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -1181,17 +1192,7 @@ function CrocoProno({ isAdmin }) {
       )}
 
       {/* ONGLET ADMIN */}
-      {tab === 'admin' && isAdmin && <AdminCroco matches={matches} pronos={pronos} onAddMatch={addMatch} onSetScore={setScore} />}
-
-      {/* Lien admin discret en bas de page */}
-      {isAdmin && (
-        <div style={{ marginTop: 40, textAlign: "center" }}>
-          <button onClick={() => setTab(tab === 'admin' ? 'pronos' : 'admin')} className="mono"
-            style={{ background: "none", border: "none", color: "#C9C2B2", fontSize: 11, cursor: "pointer", letterSpacing: 0.5 }}>
-            {tab === 'admin' ? "← Retour" : "⚙"}
-          </button>
-        </div>
-      )}
+      {tab === 'admin' && isAdmin && <AdminCroco matches={matches} pronos={pronos} onAddMatch={addMatch} onSetScore={setScore} onDeleteMatch={deleteMatch} />}
     </div>
   );
 }
@@ -1249,7 +1250,7 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
           <span className="oswald" style={{ fontSize: 11, background: clubColor, color: WHITE, borderRadius: 3, padding: "2px 8px", marginRight: 8 }}>{match.club}</span>
           <span className="mono" style={{ fontSize: 11, color: "#8A8375" }}>{match.competition}</span>
           <div className="oswald" style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
-            {match.club === 'NO' ? 'Nîmes Olympique' : 'USAM Nîmes'} vs {match.adversaire}
+            {match.isHome ? '🏠' : '✈️'} {match.club === 'NO' ? 'Nîmes Olympique' : 'USAM Nîmes'} vs {match.adversaire}
           </div>
           <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 2 }}>
             {new Date(match.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
@@ -1307,15 +1308,21 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
   );
 }
 
-function AdminCroco({ matches, pronos, onAddMatch, onSetScore }) {
-  const [form, setForm] = useState({ club: 'NO', competition: '', adversaire: '', date: '', closingDate: '' });
+function AdminCroco({ matches, pronos, onAddMatch, onSetScore, onDeleteMatch }) {
+  const [form, setForm] = useState({ club: 'NO', competition: '', adversaire: '', date: '', isHome: true });
   const [scoreForm, setScoreForm] = useState({});
   const inputS = { border: "1px solid #D8D2C2", borderRadius: 4, padding: "8px 10px", fontSize: 13, fontFamily: "'Source Serif 4', serif", color: INK, background: WHITE };
+  const labelS = { fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" };
 
   const handleAdd = () => {
     if (!form.adversaire.trim() || !form.date) return;
-    onAddMatch(form);
-    setForm({ club: 'NO', competition: '', adversaire: '', date: '', closingDate: '' });
+    // Fermeture automatique = veille à 23h59
+    const matchDate = new Date(form.date);
+    const closing = new Date(matchDate);
+    closing.setDate(closing.getDate() - 1);
+    closing.setHours(23, 59, 0, 0);
+    onAddMatch({ ...form, closingDate: closing.toISOString() });
+    setForm({ club: 'NO', competition: '', adversaire: '', date: '', isHome: true });
   };
 
   return (
@@ -1325,27 +1332,37 @@ function AdminCroco({ matches, pronos, onAddMatch, onSetScore }) {
         <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Ajouter un match</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
           <div>
-            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Club</label>
+            <label style={labelS}>Club</label>
             <select style={{ ...inputS, width: "100%" }} value={form.club} onChange={e => setForm(f => ({ ...f, club: e.target.value }))}>
               <option value="NO">Nîmes Olympique</option>
               <option value="USAM">USAM Nîmes</option>
             </select>
           </div>
           <div>
-            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Compétition</label>
+            <label style={labelS}>Domicile / Extérieur</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={() => setForm(f => ({ ...f, isHome: true }))} className="oswald"
+                style={{ flex: 1, padding: "8px", border: `2px solid ${form.isHome ? GREEN : '#D8D2C2'}`, borderRadius: 4, background: form.isHome ? GREEN : WHITE, color: form.isHome ? WHITE : INK, fontSize: 16, cursor: "pointer" }}>
+                🏠
+              </button>
+              <button type="button" onClick={() => setForm(f => ({ ...f, isHome: false }))} className="oswald"
+                style={{ flex: 1, padding: "8px", border: `2px solid ${!form.isHome ? RED : '#D8D2C2'}`, borderRadius: 4, background: !form.isHome ? RED : WHITE, color: !form.isHome ? WHITE : INK, fontSize: 16, cursor: "pointer" }}>
+                ✈️
+              </button>
+            </div>
+          </div>
+          <div>
+            <label style={labelS}>Compétition</label>
             <input style={{ ...inputS, width: "100%" }} value={form.competition} onChange={e => setForm(f => ({ ...f, competition: e.target.value }))} placeholder="Ligue 2, Pro D2…" />
           </div>
           <div>
-            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Adversaire</label>
+            <label style={labelS}>Adversaire</label>
             <input style={{ ...inputS, width: "100%" }} value={form.adversaire} onChange={e => setForm(f => ({ ...f, adversaire: e.target.value }))} placeholder="Grenoble…" />
           </div>
           <div>
-            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Date du match</label>
-            <input type="datetime-local" style={{ ...inputS, width: "100%" }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-          </div>
-          <div>
-            <label style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" }}>Fermeture pronos</label>
-            <input type="datetime-local" style={{ ...inputS, width: "100%" }} value={form.closingDate} onChange={e => setForm(f => ({ ...f, closingDate: e.target.value }))} />
+            <label style={labelS}>Date du match</label>
+            <input type="date" style={{ ...inputS, width: "100%" }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+            {form.date && <div className="mono" style={{ fontSize: 10, color: "#8A8375", marginTop: 4 }}>Pronos fermés la veille à 23h59</div>}
           </div>
         </div>
         <button onClick={handleAdd} className="oswald" style={{ marginTop: 14, background: GREEN, color: WHITE, border: "none", borderRadius: 4, padding: "9px 20px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
@@ -1360,6 +1377,7 @@ function AdminCroco({ matches, pronos, onAddMatch, onSetScore }) {
           <div key={m.id} style={{ background: WHITE, border: "1px solid #E7E3D8", borderRadius: 5, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 180 }}>
               <span className="oswald" style={{ fontSize: 11, background: m.club === 'NO' ? GREEN : RED, color: WHITE, borderRadius: 3, padding: "2px 6px", marginRight: 6 }}>{m.club}</span>
+              <span style={{ marginRight: 6 }}>{m.isHome ? '🏠' : '✈️'}</span>
               <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>vs {m.adversaire}</span>
               <span className="mono" style={{ fontSize: 10, color: "#8A8375", marginLeft: 8 }}>{new Date(m.date).toLocaleDateString('fr-FR')}</span>
             </div>
@@ -1378,6 +1396,10 @@ function AdminCroco({ matches, pronos, onAddMatch, onSetScore }) {
                 </button>
               </div>
             )}
+            <button onClick={() => { if (window.confirm('Supprimer ce match ?')) onDeleteMatch(m.id); }} title="Supprimer le match"
+              style={{ background: "none", border: "none", color: RED, cursor: "pointer", padding: 4, flexShrink: 0 }}>
+              <Trash2 size={15} />
+            </button>
           </div>
         ))}
         {matches.length === 0 && <div className="mono" style={{ color: "#8A8375", fontSize: 13 }}>Aucun match ajouté.</div>}
