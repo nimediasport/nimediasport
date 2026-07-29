@@ -213,7 +213,9 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: WHITE, fontFamily: "'Source Serif 4', serif", color: INK }}>
       <style>{`
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { overflow-x: hidden; width: 100%; }
+        img { max-width: 100%; display: block; }
         .oswald { font-family: 'Oswald', sans-serif; }
         .bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.5px; }
         .mono { font-family: 'IBM Plex Mono', monospace; }
@@ -232,13 +234,20 @@ export default function App() {
         @media (max-width: 680px) {
           .header-slogan { display: none !important; }
           .header-nav-center { display: none !important; }
+          .croco-mobile-btn { display: inline-flex !important; }
           .news-layout { flex-direction: column !important; }
-          .news-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .news-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 2px !important; }
           .hashtag-sidebar { display: none !important; }
           .hashtag-mobile { display: flex !important; }
           .post-modal-inner { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; }
           .croco-form-grid { grid-template-columns: 1fr !important; }
           .leaderboard-table th:nth-child(n+5), .leaderboard-table td:nth-child(n+5) { display: none; }
+          .main-container { padding: 0 0 60px !important; }
+          .last-news-title { padding: 12px 10px 8px !important; }
+          .hashtag-pills { padding: 0 10px 8px !important; }
+        }
+        @media (min-width: 681px) {
+          .croco-mobile-btn { display: none !important; }
         }
       `}</style>
 
@@ -277,7 +286,8 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {/* Crocoprono visible sur mobile */}
             <button onClick={() => setView(view === "crocoprono" ? "public" : "crocoprono")} className="oswald"
-              style={{ display: "none", background: "none", border: "none", color: view === "crocoprono" ? GREEN : "rgba(255,255,255,0.6)", fontSize: 20, cursor: "pointer", padding: "4px" }}>
+              style={{ background: "none", border: "none", color: view === "crocoprono" ? GREEN : "rgba(255,255,255,0.6)", fontSize: 20, cursor: "pointer", padding: "4px" }}
+              className="croco-mobile-btn">
               🐊
             </button>
             <button onClick={() => setShowSubmit(true)} className="oswald"
@@ -320,7 +330,7 @@ export default function App() {
       {/* Modal Modification d'article */}
       {editingArticle && <EditModal article={editingArticle} onSave={(data) => updateArticle(editingArticle.id, data)} onClose={() => setEditingArticle(null)} />}
 
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 0 80px" }}>
+      <main className="main-container" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 0 80px", width: "100%" }}>
         {loading ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", padding: "80px 0", color: "#8A8375" }}>
             <Loader2 className="mono" size={18} style={{ animation: "spin 1s linear infinite" }} />
@@ -337,7 +347,7 @@ export default function App() {
         ) : (
           <>
             {/* Titre de section */}
-            <div style={{ padding: "18px 16px 10px", borderBottom: `2px solid ${RED}`, marginBottom: 2 }}>
+            <div className="last-news-title" style={{ padding: "18px 16px 10px", borderBottom: `2px solid ${RED}`, marginBottom: 2 }}>
               <h1 className="bebas" style={{ fontSize: 28, margin: 0, letterSpacing: 1, color: INK }}>
                 Last <span style={{ color: RED }}>News</span>
               </h1>
@@ -349,7 +359,7 @@ export default function App() {
               {/* Grille articles */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 {/* Barre hashtag horizontale sur mobile */}
-                <div className="hashtag-mobile" style={{ display: "none", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 8, flexWrap: "nowrap" }}>
+                <div className="hashtag-mobile hashtag-pills" style={{ display: "none", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 8, flexWrap: "nowrap", padding: "0 16px 10px" }}>
                   <button onClick={() => setActiveTag(null)} className="oswald"
                     style={{ background: !activeTag ? RED : "#F0EBE3", color: !activeTag ? WHITE : INK, border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
                     Tout
