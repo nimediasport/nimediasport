@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { storage } from "./supabase";
-import { PenSquare, Trash2, Calendar, User, ChevronRight, Loader2, Heart, MessageCircle, Send, Bookmark, ImageOff, Sparkles } from "lucide-react";
+import { PenSquare, Trash2, Calendar, User, ChevronRight, Loader2, Heart, MessageCircle, Send, Bookmark, ImageOff, Sparkles, Mail } from "lucide-react";
 
 const FONT_LINK_ID = "nimediasport-fonts";
 
@@ -67,6 +67,7 @@ export default function App() {
   const [loginError, setLoginError] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [editingArticle, setEditingArticle] = useState(null);
+  const [activeTag, setActiveTag] = useState(null);
 
   const ENG_KEY = "nimediasport-engagement";
 
@@ -276,7 +277,7 @@ export default function App() {
       {/* Modal Modification d'article */}
       {editingArticle && <EditModal article={editingArticle} onSave={(data) => updateArticle(editingArticle.id, data)} onClose={() => setEditingArticle(null)} />}
 
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "0 0 80px" }}>
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 0 80px" }}>
         {loading ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", padding: "80px 0", color: "#8A8375" }}>
             <Loader2 className="mono" size={18} style={{ animation: "spin 1s linear infinite" }} />
@@ -295,16 +296,38 @@ export default function App() {
               </h1>
             </div>
 
-            {/* Grille 4 colonnes façon Instagram */}
-            {articles.length === 0 ? (
-              <div style={{ padding: "20px" }}><EmptyState onGoRedaction={() => setView("redaction")} /></div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginTop: 2 }}>
-                {articles.map((a) => (
-                  <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} />
-                ))}
+            {/* Layout : grille + sidebar */}
+            <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginTop: 4 }}>
+
+              {/* Grille articles */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {articles.length === 0 ? (
+                  <div style={{ padding: "20px" }}><EmptyState onGoRedaction={() => setView("redaction")} /></div>
+                ) : (() => {
+                  const filtered = activeTag ? articles.filter(a => a.hashtag === activeTag) : articles;
+                  return filtered.length === 0 ? (
+                    <div style={{ padding: "40px 20px", textAlign: "center", color: "#8A8375" }} className="oswald">
+                      Aucun article pour ce hashtag.
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+                      {filtered.map((a) => (
+                        <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} />
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
-            )}
+
+              {/* Sidebar hashtags */}
+              {articles.length > 0 && (
+                <HashtagSidebar
+                  articles={articles}
+                  activeTag={activeTag}
+                  onSelect={setActiveTag}
+                />
+              )}
+            </div>
 
             {/* Modal post au clic */}
             {openArticle && (
@@ -324,10 +347,55 @@ export default function App() {
       </main>
 
       <footer style={{ background: INK, color: "#8A8375", padding: "22px 20px", textAlign: "center", borderTop: `3px solid ${GREEN}` }}>
-        <div className="mono" style={{ fontSize: 11, letterSpacing: 1 }}>
-          NÎMEDIASPORT - Un site d'actu' sportive Nîmoise créé avec Claude
+        <div className="mono" style={{ fontSize: 11, letterSpacing: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+          <span>NÎMEDIASPORT - Une Nîmoiserie créée avec l'aide de Claude</span>
+          <a
+            href="mailto:nimes.mediasport@gmail.com"
+            onClick={e => { e.stopPropagation(); window.open('mailto:nimes.mediasport@gmail.com'); }}
+            title="nimes.mediasport@gmail.com"
+            style={{ color: "#8A8375", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", textDecoration: "none" }}
+            onMouseEnter={e => e.currentTarget.style.color = WHITE}
+            onMouseLeave={e => e.currentTarget.style.color = "#8A8375"}>
+            <Mail size={15} />
+            <span style={{ fontSize: 11, letterSpacing: 0.5 }}>nimes.mediasport@gmail.com</span>
+          </a>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function HashtagSidebar({ articles, activeTag, onSelect }) {
+  // Compter les articles par hashtag
+  const counts = {};
+  articles.forEach(a => {
+    const tag = a.hashtag || DEFAULT_HASHTAG;
+    counts[tag] = (counts[tag] || 0) + 1;
+  });
+  const tags = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div style={{ width: 170, flexShrink: 0, position: "sticky", top: 80 }}>
+      <div className="oswald" style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#8A8375", padding: "12px 0 8px", borderBottom: `2px solid ${INK}`, marginBottom: 8 }}>
+        Catégories
+      </div>
+      <button
+        onClick={() => onSelect(null)}
+        className="oswald"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", background: !activeTag ? RED : "none", color: !activeTag ? WHITE : INK, border: "none", borderRadius: 4, padding: "7px 10px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 4, textAlign: "left" }}>
+        <span>Tout voir</span>
+        <span style={{ fontSize: 11, opacity: 0.75 }}>{articles.length}</span>
+      </button>
+      {tags.map(([tag, count]) => (
+        <button
+          key={tag}
+          onClick={() => onSelect(activeTag === tag ? null : tag)}
+          className="oswald"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", background: activeTag === tag ? RED : "none", color: activeTag === tag ? WHITE : INK, border: "none", borderRadius: 4, padding: "7px 10px", fontSize: 12, fontWeight: activeTag === tag ? 700 : 500, cursor: "pointer", marginBottom: 3, textAlign: "left", transition: "background 0.15s" }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tag}</span>
+          <span style={{ fontSize: 11, opacity: 0.75, flexShrink: 0, marginLeft: 4 }}>{count}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -396,7 +464,7 @@ function PostModal({ article, onClose, eng, liked, onLike, onComment, isAdmin, o
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: WHITE, borderRadius: 10, overflow: "hidden", width: "100%", maxWidth: 480, maxHeight: "94vh", display: "flex", flexDirection: "column" }}>
 
-        {/* En-tête */}
+        {/* En-tête fixe */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid #EAD9DB", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Logo size={32} />
@@ -405,45 +473,48 @@ function PostModal({ article, onClose, eng, liked, onLike, onComment, isAdmin, o
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#8A8375", fontSize: 24, lineHeight: 1, padding: "0 4px", cursor: "pointer" }}>×</button>
         </div>
 
-        {/* Image */}
-        <div style={{ aspectRatio: "4 / 5", background: "#F4EBEC", flexShrink: 0, overflow: "hidden" }}>
-          {article.image && !failed ? (
-            <img src={article.image} alt="" onError={() => setFailed(true)}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-          ) : (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ImageOff size={32} color={RED} />
-            </div>
-          )}
-        </div>
+        {/* Tout le contenu défile ensemble : image + actions + texte */}
+        <div style={{ overflowY: "auto", flexShrink: 1 }}>
 
-        {/* Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "10px 14px 4px", flexShrink: 0 }}>
-          <button onClick={handleLike} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "4px 8px 4px 0", color: isLiked ? RED : INK }}>
-            <Heart size={24} fill={isLiked ? RED : "none"} color={isLiked ? RED : INK} />
-            {likes > 0 && <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>{likes}</span>}
-          </button>
-          <button onClick={() => setShowCommentBox(s => !s)} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "4px 8px", color: showCommentBox ? RED : INK }}>
-            <MessageCircle size={22} />
-            {comments.length > 0 && <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>{comments.length}</span>}
-          </button>
-          <button onClick={handleShare} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "4px 8px", color: shared ? RED : INK }}>
-            <Send size={22} />
-            {shared && <span className="oswald" style={{ fontSize: 11, color: RED }}>Copié !</span>}
-          </button>
-          <div style={{ marginLeft: "auto" }}>
-            {isAdmin ? (
-              <button onClick={onEdit} title="Modifier l'article" style={{ background: "none", border: "none", color: INK, padding: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-                <PenSquare size={19} />
-              </button>
+          {/* Image */}
+          <div style={{ aspectRatio: "4 / 5", background: "#F4EBEC", overflow: "hidden" }}>
+            {article.image && !failed ? (
+              <img src={article.image} alt="" onError={() => setFailed(true)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             ) : (
-              <Bookmark size={20} color={INK} />
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ImageOff size={32} color={RED} />
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Contenu scrollable */}
-        <div style={{ overflowY: "auto", padding: "6px 14px 16px", flexShrink: 1 }}>
+          {/* Actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "10px 14px 4px" }}>
+            <button onClick={handleLike} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "4px 8px 4px 0", color: isLiked ? RED : INK }}>
+              <Heart size={24} fill={isLiked ? RED : "none"} color={isLiked ? RED : INK} />
+              {likes > 0 && <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>{likes}</span>}
+            </button>
+            <button onClick={() => setShowCommentBox(s => !s)} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "4px 8px", color: showCommentBox ? RED : INK }}>
+              <MessageCircle size={22} />
+              {comments.length > 0 && <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>{comments.length}</span>}
+            </button>
+            <button onClick={handleShare} style={{ background: "none", border: "none", display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "4px 8px", color: shared ? RED : INK }}>
+              <Send size={22} />
+              {shared && <span className="oswald" style={{ fontSize: 11, color: RED }}>Copié !</span>}
+            </button>
+            <div style={{ marginLeft: "auto" }}>
+              {isAdmin ? (
+                <button onClick={onEdit} title="Modifier l'article" style={{ background: "none", border: "none", color: INK, padding: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                  <PenSquare size={19} />
+                </button>
+              ) : (
+                <Bookmark size={20} color={INK} />
+              )}
+            </div>
+          </div>
+
+          {/* Contenu texte */}
+          <div style={{ padding: "6px 14px 16px" }}>
           <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px", color: INK }}>
             {article.content || article.excerpt}
           </p>
@@ -491,6 +562,7 @@ function PostModal({ article, onClose, eng, liked, onLike, onComment, isAdmin, o
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
