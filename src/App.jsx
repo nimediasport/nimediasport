@@ -382,9 +382,14 @@ export default function App() {
                       Aucun article pour ce hashtag.
                     </div>
                   ) : (
-                    <div className="news-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+                    <div className="news-grid" style={{
+                      display: "grid",
+                      gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                      gap: isMobile ? 16 : 4,
+                      padding: isMobile ? "0 16px" : 0,
+                    }}>
                       {filtered.map((a) => (
-                        <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} />
+                        <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} isMobile={isMobile} />
                       ))}
                     </div>
                   );
@@ -480,11 +485,21 @@ function HashtagSidebar({ articles, activeTag, onSelect }) {
   );
 }
 
-function GridThumb({ article, onOpen }) {
+function GridThumb({ article, onOpen, isMobile }) {
   const [failed, setFailed] = useState(false);
   const hashtag = article.hashtag || DEFAULT_HASHTAG;
   return (
-    <div onClick={onOpen} className="card" style={{ position: "relative", aspectRatio: "4 / 5", overflow: "hidden", cursor: "pointer", background: "#F4EBEC" }}>
+    <div onClick={onOpen} className="card" style={{
+      position: "relative",
+      aspectRatio: "4 / 5",
+      overflow: "hidden",
+      cursor: "pointer",
+      background: "#F4EBEC",
+      width: isMobile ? "calc(100vw - 32px)" : "100%",
+      maxWidth: isMobile ? 480 : "100%",
+      margin: isMobile ? "0 auto" : 0,
+      borderRadius: isMobile ? 8 : 0,
+    }}>
       {article.image && !failed ? (
         <img src={article.image} alt="" onError={() => setFailed(true)}
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -1125,6 +1140,15 @@ function CrocoProno({ isAdmin }) {
     showToast('Match ajouté !');
   };
 
+  const updateMatch = async (id, data) => {
+    const closing = new Date(data.date);
+    closing.setDate(closing.getDate() - 1);
+    closing.setHours(23, 59, 0, 0);
+    const next = matches.map(m => m.id === id ? { ...m, ...data, closingDate: closing.toISOString() } : m);
+    await saveMatches(next);
+    showToast('Match modifié !');
+  };
+
   const deleteMatch = async (matchId) => {
     const next = matches.filter(m => m.id !== matchId);
     await saveMatches(next);
@@ -1201,6 +1225,9 @@ function CrocoProno({ isAdmin }) {
       {tab === 'pronos' && (
         <div>
           {!currentUser && <PronoLogin onLogin={handleLogin} />}
+          <div className="mono" style={{ fontSize: 12, color: "#8A8375", background: "#F8F4EF", border: "1px solid #E7E3D8", borderLeft: `3px solid ${GREEN}`, borderRadius: 4, padding: "10px 14px", marginBottom: 16 }}>
+            ⏰ Les matchs doivent être pronostiqués avant le début de chaque journée de championnat
+          </div>
           {matches.length === 0 && <div className="oswald" style={{ color: "#8A8375", textAlign: "center", padding: 40 }}>Aucun match à pronostiquer pour l'instant.</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {[...matches].sort((a, b) => new Date(a.date) - new Date(b.date)).map(match => {
@@ -1248,7 +1275,7 @@ function CrocoProno({ isAdmin }) {
       )}
 
       {/* ONGLET ADMIN */}
-      {tab === 'admin' && isAdmin && <AdminCroco matches={matches} pronos={pronos} onAddMatch={addMatch} onSetScore={setScore} onDeleteMatch={deleteMatch} />}
+      {tab === 'admin' && isAdmin && <AdminCroco matches={matches} pronos={pronos} onAddMatch={addMatch} onSetScore={setScore} onDeleteMatch={deleteMatch} onUpdateMatch={updateMatch} />}
     </div>
   );
 }
@@ -1284,7 +1311,7 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
   const [home, setHome] = useState(myProno?.scoreHome ?? '');
   const [away, setAway] = useState(myProno?.scoreAway ?? '');
   const [saving, setSaving] = useState(false);
-  const clubColor = match.club === 'NO' ? GREEN : RED;
+  const clubColor = match.club === 'NO' ? RED : GREEN;
   const pts = myProno?.points;
 
   useEffect(() => {
@@ -1309,7 +1336,7 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
             {match.isHome ? '🏠' : '✈️'} {match.club === 'NO' ? 'Nîmes Olympique' : 'USAM Nîmes'} vs {match.adversaire}
           </div>
           <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 2 }}>
-            {new Date(match.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+            {new Date(match.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
         </div>
         {/* Score réel si terminé */}
@@ -1364,9 +1391,11 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
   );
 }
 
-function AdminCroco({ matches, pronos, onAddMatch, onSetScore, onDeleteMatch }) {
+function AdminCroco({ matches, pronos, onAddMatch, onSetScore, onDeleteMatch, onUpdateMatch }) {
   const [form, setForm] = useState({ club: 'NO', competition: '', adversaire: '', date: '', isHome: true });
   const [scoreForm, setScoreForm] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
   const inputS = { border: "1px solid #D8D2C2", borderRadius: 4, padding: "8px 10px", fontSize: 13, fontFamily: "'Source Serif 4', serif", color: INK, background: WHITE };
   const labelS = { fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", display: "block", marginBottom: 4, color: "#4A453C" };
 
@@ -1427,35 +1456,88 @@ function AdminCroco({ matches, pronos, onAddMatch, onSetScore, onDeleteMatch }) 
       </div>
 
       {/* Saisir les scores */}
-      <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 12 }}>Saisir les scores réels</div>
+      <div className="oswald" style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 12 }}>Gérer les matchs</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {matches.map(m => (
-          <div key={m.id} style={{ background: WHITE, border: "1px solid #E7E3D8", borderRadius: 5, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <span className="oswald" style={{ fontSize: 11, background: m.club === 'NO' ? GREEN : RED, color: WHITE, borderRadius: 3, padding: "2px 6px", marginRight: 6 }}>{m.club}</span>
-              <span style={{ marginRight: 6 }}>{m.isHome ? '🏠' : '✈️'}</span>
-              <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>vs {m.adversaire}</span>
-              <span className="mono" style={{ fontSize: 10, color: "#8A8375", marginLeft: 8 }}>{new Date(m.date).toLocaleDateString('fr-FR')}</span>
-            </div>
-            {m.status === 'finished' ? (
-              <div className="oswald" style={{ fontSize: 16, fontWeight: 700, color: GREEN }}>✓ {m.scoreHome} - {m.scoreAway}</div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="number" min={0} max={20} placeholder="D" value={scoreForm[m.id]?.h ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], h: e.target.value } }))}
-                  style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
-                <span className="oswald">-</span>
-                <input type="number" min={0} max={20} placeholder="E" value={scoreForm[m.id]?.a ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], a: e.target.value } }))}
-                  style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
-                <button onClick={() => onSetScore(m.id, parseInt(scoreForm[m.id]?.h || 0), parseInt(scoreForm[m.id]?.a || 0))} className="oswald"
-                  style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  Valider
+          <div key={m.id} style={{ background: WHITE, border: "1px solid #E7E3D8", borderRadius: 5, overflow: "hidden" }}>
+            <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <span className="oswald" style={{ fontSize: 11, background: m.club === 'NO' ? RED : GREEN, color: WHITE, borderRadius: 3, padding: "2px 6px", marginRight: 6 }}>{m.club}</span>
+                <span style={{ marginRight: 6 }}>{m.isHome ? '🏠' : '✈️'}</span>
+                <span className="oswald" style={{ fontSize: 13, fontWeight: 600 }}>vs {m.adversaire}</span>
+                <span className="mono" style={{ fontSize: 10, color: "#8A8375", marginLeft: 8 }}>{new Date(m.date).toLocaleDateString('fr-FR')}</span>
+              </div>
+              {m.status === 'finished' ? (
+                <div className="oswald" style={{ fontSize: 16, fontWeight: 700, color: GREEN }}>✓ {m.scoreHome} - {m.scoreAway}</div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input type="number" min={0} max={20} placeholder="D" value={scoreForm[m.id]?.h ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], h: e.target.value } }))}
+                    style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
+                  <span className="oswald">-</span>
+                  <input type="number" min={0} max={20} placeholder="E" value={scoreForm[m.id]?.a ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], a: e.target.value } }))}
+                    style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
+                  <button onClick={() => onSetScore(m.id, parseInt(scoreForm[m.id]?.h || 0), parseInt(scoreForm[m.id]?.a || 0))} className="oswald"
+                    style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    Valider
+                  </button>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <button onClick={() => { setEditingId(editingId === m.id ? null : m.id); setEditForm({ club: m.club, competition: m.competition || '', adversaire: m.adversaire, date: m.date?.slice(0,10) || '', isHome: m.isHome ?? true }); }} title="Modifier"
+                  style={{ background: "none", border: "none", color: editingId === m.id ? GREEN : INK, cursor: "pointer", padding: 4 }}>
+                  <PenSquare size={15} />
+                </button>
+                <button onClick={() => { if (window.confirm('Supprimer ce match ?')) onDeleteMatch(m.id); }} title="Supprimer"
+                  style={{ background: "none", border: "none", color: RED, cursor: "pointer", padding: 4 }}>
+                  <Trash2 size={15} />
                 </button>
               </div>
+            </div>
+            {/* Formulaire d'édition inline */}
+            {editingId === m.id && (
+              <div style={{ background: "#F8F4EF", borderTop: "1px solid #E7E3D8", padding: "14px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <label style={{ ...labelS }}>Club</label>
+                    <select style={{ ...inputS, width: "100%" }} value={editForm.club} onChange={e => setEditForm(f => ({ ...f, club: e.target.value }))}>
+                      <option value="NO">Nîmes Olympique</option>
+                      <option value="USAM">USAM Nîmes</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ ...labelS }}>Dom. / Ext.</label>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button type="button" onClick={() => setEditForm(f => ({ ...f, isHome: true }))}
+                        style={{ flex: 1, padding: "7px", border: `2px solid ${editForm.isHome ? GREEN : '#D8D2C2'}`, borderRadius: 4, background: editForm.isHome ? GREEN : WHITE, cursor: "pointer", fontSize: 14 }}>🏠</button>
+                      <button type="button" onClick={() => setEditForm(f => ({ ...f, isHome: false }))}
+                        style={{ flex: 1, padding: "7px", border: `2px solid ${!editForm.isHome ? RED : '#D8D2C2'}`, borderRadius: 4, background: !editForm.isHome ? RED : WHITE, cursor: "pointer", fontSize: 14 }}>✈️</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ ...labelS }}>Compétition</label>
+                    <input style={{ ...inputS, width: "100%" }} value={editForm.competition} onChange={e => setEditForm(f => ({ ...f, competition: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={{ ...labelS }}>Adversaire</label>
+                    <input style={{ ...inputS, width: "100%" }} value={editForm.adversaire} onChange={e => setEditForm(f => ({ ...f, adversaire: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={{ ...labelS }}>Date</label>
+                    <input type="date" style={{ ...inputS, width: "100%" }} value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { onUpdateMatch(m.id, editForm); setEditingId(null); }} className="oswald"
+                    style={{ background: GREEN, color: WHITE, border: "none", borderRadius: 4, padding: "7px 16px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
+                    Enregistrer
+                  </button>
+                  <button onClick={() => setEditingId(null)} className="oswald"
+                    style={{ background: "none", border: "1px solid #D8D2C2", borderRadius: 4, padding: "7px 14px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", color: "#6B6456" }}>
+                    Annuler
+                  </button>
+                </div>
+              </div>
             )}
-            <button onClick={() => { if (window.confirm('Supprimer ce match ?')) onDeleteMatch(m.id); }} title="Supprimer le match"
-              style={{ background: "none", border: "none", color: RED, cursor: "pointer", padding: 4, flexShrink: 0 }}>
-              <Trash2 size={15} />
-            </button>
           </div>
         ))}
         {matches.length === 0 && <div className="mono" style={{ color: "#8A8375", fontSize: 13 }}>Aucun match ajouté.</div>}
