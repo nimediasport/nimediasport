@@ -287,9 +287,9 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {/* Crocoprono visible sur mobile */}
             <button onClick={() => setView(view === "crocoprono" ? "public" : "crocoprono")} className="oswald"
-              style={{ background: "none", border: "none", color: view === "crocoprono" ? GREEN : "rgba(255,255,255,0.6)", fontSize: 20, cursor: "pointer", padding: "4px" }}
-              className="croco-mobile-btn">
-              🐊
+              style={{ background: "none", border: `1px solid ${view === "crocoprono" ? GREEN : "rgba(255,255,255,0.3)"}`, color: view === "crocoprono" ? GREEN : "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer", padding: "6px 10px", borderRadius: 3, whiteSpace: "nowrap" }}
+              className="croco-mobile-btn oswald">
+              🐊 Prono
             </button>
             <button onClick={() => setShowSubmit(true)} className="oswald"
               style={{ display: "flex", alignItems: "center", gap: 6, background: RED, border: "none", color: WHITE, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "8px 16px", borderRadius: 3, cursor: "pointer" }}>
@@ -488,6 +488,37 @@ function HashtagSidebar({ articles, activeTag, onSelect }) {
 function GridThumb({ article, onOpen, isMobile }) {
   const [failed, setFailed] = useState(false);
   const hashtag = article.hashtag || DEFAULT_HASHTAG;
+
+  if (isMobile) {
+    return (
+      <div onClick={onOpen} className="card" style={{
+        position: "relative",
+        cursor: "pointer",
+        background: "#F4EBEC",
+        width: "calc(100vw - 32px)",
+        maxWidth: 480,
+        margin: "0 auto",
+        borderRadius: 8,
+        overflow: "hidden",
+      }}>
+        {article.image && !failed ? (
+          <img src={article.image} alt="" onError={() => setFailed(true)}
+            style={{ width: "100%", height: "auto", display: "block" }} />
+        ) : (
+          <div style={{ width: "100%", height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ImageOff size={22} color={RED} />
+          </div>
+        )}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.75))", padding: "28px 10px 8px" }}>
+          {article.title && (
+            <div className="oswald" style={{ color: WHITE, fontSize: 13, fontWeight: 700, lineHeight: 1.2, marginBottom: 3 }}>{article.title}</div>
+          )}
+          <span className="mono" style={{ color: "rgba(255,255,255,0.8)", fontSize: 11 }}>{hashtag}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div onClick={onOpen} className="card" style={{
       position: "relative",
@@ -495,10 +526,6 @@ function GridThumb({ article, onOpen, isMobile }) {
       overflow: "hidden",
       cursor: "pointer",
       background: "#F4EBEC",
-      width: isMobile ? "calc(100vw - 32px)" : "100%",
-      maxWidth: isMobile ? 480 : "100%",
-      margin: isMobile ? "0 auto" : 0,
-      borderRadius: isMobile ? 8 : 0,
     }}>
       {article.image && !failed ? (
         <img src={article.image} alt="" onError={() => setFailed(true)}
@@ -508,7 +535,6 @@ function GridThumb({ article, onOpen, isMobile }) {
           <ImageOff size={22} color={RED} />
         </div>
       )}
-      {/* Hashtag + titre en overlay en bas de l'image */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.75))", padding: "28px 10px 8px" }}>
         {article.title && (
           <div className="oswald" style={{ color: WHITE, fontSize: 13, fontWeight: 700, lineHeight: 1.2, marginBottom: 3 }}>{article.title}</div>
