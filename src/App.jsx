@@ -44,6 +44,19 @@ function useIsMobile() {
   return isMobile;
 }
 
+function parseLinks(text) {
+  if (!text) return '';
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const withBreaks = escaped.replace(/\n/g, '<br>');
+  return withBreaks.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+    `<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#C8102E;font-weight:700;text-decoration:underline;">$1</a>`
+  );
+}
+
 function formatDate(iso) {
   try {
     return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -358,7 +371,7 @@ export default function App() {
             <div className="news-layout" style={{ display: "flex", gap: 20, alignItems: "flex-start", marginTop: 4 }}>
 
               {/* Grille articles */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, overflow: "hidden", padding: isMobile ? "0 12px" : 0 }}>
                 {/* Barre hashtag horizontale sur mobile */}
                 <div className="hashtag-mobile hashtag-pills" style={{ display: "none", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 8, flexWrap: "nowrap", padding: "0 16px 10px" }}>
                   <button onClick={() => setActiveTag(null)} className="oswald"
@@ -385,8 +398,10 @@ export default function App() {
                     <div className="news-grid" style={{
                       display: "grid",
                       gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-                      gap: isMobile ? 16 : 4,
-                      padding: isMobile ? "0 16px" : 0,
+                      gap: isMobile ? 12 : 4,
+                      padding: 0,
+                      boxSizing: "border-box",
+                      width: "100%",
                     }}>
                       {filtered.map((a) => (
                         <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} isMobile={isMobile} />
@@ -495,15 +510,13 @@ function GridThumb({ article, onOpen, isMobile }) {
         position: "relative",
         cursor: "pointer",
         background: "#F4EBEC",
-        width: "calc(100vw - 32px)",
-        maxWidth: 480,
-        margin: "0 auto",
-        borderRadius: 8,
+        width: "100%",
         overflow: "hidden",
+        borderRadius: 8,
       }}>
         {article.image && !failed ? (
           <img src={article.image} alt="" onError={() => setFailed(true)}
-            style={{ width: "100%", height: "auto", display: "block" }} />
+            style={{ width: "100%", maxWidth: "100%", height: "auto", display: "block" }} />
         ) : (
           <div style={{ width: "100%", height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ImageOff size={22} color={RED} />
@@ -642,9 +655,8 @@ function PostModal({ article, onClose, eng, liked, onLike, onComment, isAdmin, o
             {article.title && (
               <div className="oswald" style={{ fontSize: 17, fontWeight: 700, color: INK, marginBottom: 6, lineHeight: 1.25 }}>{article.title}</div>
             )}
-          <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px", color: INK }}>
-            {article.content || article.excerpt}
-          </p>
+          <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px", color: INK }}
+            dangerouslySetInnerHTML={{ __html: parseLinks(article.content || article.excerpt) }} />
           <div style={{ marginBottom: 8 }}>
             <span className="oswald" style={{ color: RED, fontWeight: 600, fontSize: 13 }}>{hashtag}</span>
           </div>
@@ -758,6 +770,9 @@ function CommunitySubmitForm({ onSubmit, onClose }) {
           <div>
             <label style={labelStyle}>Texte (obligatoire)</label>
             <textarea style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} value={excerpt} onChange={e => setExcerpt(e.target.value)} placeholder="Décrivez votre actualité en quelques phrases…" />
+            <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 6, lineHeight: 1.5 }}>
+              💡 Lien cliquable : <span style={{ background: "#F0EBE3", padding: "2px 6px", borderRadius: 3, fontFamily: "monospace" }}>[mot](https://url.com)</span>
+            </div>
           </div>
           {error && <div className="oswald" style={{ color: RED, fontSize: 12 }}>{error}</div>}
           <button onClick={handleSubmit} className="oswald" style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "11px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
@@ -821,6 +836,9 @@ function EditModal({ article, onSave, onClose }) {
           <div>
             <label style={labelStyle}>Texte (obligatoire)</label>
             <textarea style={{ ...inputStyle, minHeight: 100, resize: "vertical" }} value={content} onChange={e => setContent(e.target.value)} />
+            <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 6, lineHeight: 1.5 }}>
+              💡 Lien cliquable : <span style={{ background: "#F0EBE3", padding: "2px 6px", borderRadius: 3, fontFamily: "monospace" }}>[mot](https://url.com)</span>
+            </div>
           </div>
           <button onClick={() => onSave({ image, title: artTitle, excerpt: content || excerpt, content: content || excerpt, hashtag: (hashtag.startsWith("#") ? hashtag : "#"+hashtag).replace(/\s+/g,"") })} className="oswald" style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "11px", fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>
             Enregistrer les modifications
@@ -1014,6 +1032,9 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balises markdown, sans texte
         <div>
           <label style={labelStyle}>Texte (obligatoire)</label>
           <textarea style={{ ...inputStyle, minHeight: 140, resize: "vertical" }} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Le texte de la publication." />
+          <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 6, lineHeight: 1.5 }}>
+            💡 Pour ajouter un lien cliquable dans le texte : <span style={{ background: "#F0EBE3", padding: "2px 6px", borderRadius: 3, fontFamily: "monospace" }}>[mot](https://url.com)</span>
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Auteur (optionnel)</label>
