@@ -95,6 +95,8 @@ export default function App() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [editingArticle, setEditingArticle] = useState(null);
   const [activeTag, setActiveTag] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ARTICLES_PER_PAGE = 12;
 
   const ENG_KEY = "nimediasport-engagement";
 
@@ -374,12 +376,12 @@ export default function App() {
               <div style={{ flex: 1, minWidth: 0, overflow: "hidden", padding: isMobile ? "0 12px" : 0 }}>
                 {/* Barre hashtag horizontale sur mobile */}
                 <div className="hashtag-mobile hashtag-pills" style={{ display: "none", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 8, flexWrap: "nowrap", padding: "0 16px 10px" }}>
-                  <button onClick={() => setActiveTag(null)} className="oswald"
+                  <button onClick={() => { setActiveTag(null); setCurrentPage(1); }} className="oswald"
                     style={{ background: !activeTag ? RED : "#F0EBE3", color: !activeTag ? WHITE : INK, border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
                     Tout
                   </button>
                   {[...new Set(articles.map(a => a.hashtag || DEFAULT_HASHTAG))].map(tag => (
-                    <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className="oswald"
+                    <button key={tag} onClick={() => { setActiveTag(activeTag === tag ? null : tag); setCurrentPage(1); }} className="oswald"
                       style={{ background: activeTag === tag ? RED : "#F0EBE3", color: activeTag === tag ? WHITE : INK, border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
                       {tag}
                     </button>
@@ -390,23 +392,47 @@ export default function App() {
                   <div style={{ padding: "20px" }}><EmptyState onGoRedaction={() => setView("redaction")} /></div>
                 ) : (() => {
                   const filtered = activeTag ? articles.filter(a => a.hashtag === activeTag) : articles;
+                  const totalPages = Math.ceil(filtered.length / ARTICLES_PER_PAGE);
+                  const paginated = filtered.slice((currentPage - 1) * ARTICLES_PER_PAGE, currentPage * ARTICLES_PER_PAGE);
                   return filtered.length === 0 ? (
                     <div style={{ padding: "40px 20px", textAlign: "center", color: "#8A8375" }} className="oswald">
                       Aucun article pour ce hashtag.
                     </div>
                   ) : (
-                    <div className="news-grid" style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-                      gap: isMobile ? 12 : 4,
-                      padding: 0,
-                      boxSizing: "border-box",
-                      width: "100%",
-                    }}>
-                      {filtered.map((a) => (
-                        <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} isMobile={isMobile} />
-                      ))}
-                    </div>
+                    <>
+                      <div className="news-grid" style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                        gap: isMobile ? 12 : 4,
+                        padding: 0,
+                        boxSizing: "border-box",
+                        width: "100%",
+                      }}>
+                        {paginated.map((a) => (
+                          <GridThumb key={a.id} article={a} onOpen={() => setOpenArticle(a)} isMobile={isMobile} />
+                        ))}
+                      </div>
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, padding: "24px 0 8px", flexWrap: "wrap" }}>
+                          <button onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }} disabled={currentPage === 1} className="oswald"
+                            style={{ background: "none", border: `1px solid ${currentPage === 1 ? "#D8D2C2" : RED}`, color: currentPage === 1 ? "#D8D2C2" : RED, borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: currentPage === 1 ? "default" : "pointer" }}>
+                            ← Précédent
+                          </button>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                            <button key={p} onClick={() => { setCurrentPage(p); window.scrollTo(0, 0); }} className="oswald"
+                              style={{ background: p === currentPage ? RED : "none", color: p === currentPage ? WHITE : INK, border: `1px solid ${p === currentPage ? RED : "#D8D2C2"}`, borderRadius: 4, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minWidth: 36 }}>
+                              {p}
+                            </button>
+                          ))}
+                          <button onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }} disabled={currentPage === totalPages} className="oswald"
+                            style={{ background: "none", border: `1px solid ${currentPage === totalPages ? "#D8D2C2" : RED}`, color: currentPage === totalPages ? "#D8D2C2" : RED, borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: currentPage === totalPages ? "default" : "pointer" }}>
+                            Suivant →
+                          </button>
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
               </div>
@@ -416,7 +442,7 @@ export default function App() {
                 <HashtagSidebar
                   articles={articles}
                   activeTag={activeTag}
-                  onSelect={setActiveTag}
+                  onSelect={(tag) => { setActiveTag(tag); setCurrentPage(1); }}
                 />
               )}
             </div>
@@ -1109,12 +1135,14 @@ async function hashCode(pseudo, code) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-function calcPoints(ph, pa, rh, ra) {
+function calcPoints(ph, pa, rh, ra, club) {
   if (rh === null || ra === null) return null;
-  if (ph === rh && pa === ra) return 3;
+  const exactPts  = club === 'USAM' ? 5 : 3;
+  const resultPts = club === 'USAM' ? 2 : 1;
+  if (ph === rh && pa === ra) return exactPts;
   const pr = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
   const rr = rh > ra ? 'H' : rh < ra ? 'A' : 'D';
-  return pr === rr ? 1 : 0;
+  return pr === rr ? resultPts : 0;
 }
 
 function isClosed(match) {
@@ -1174,7 +1202,7 @@ function CrocoProno({ isAdmin }) {
     if (!currentUser) return;
     const pronoKey = `${matchId}__${currentUser.key}`;
     const match = matches.find(m => m.id === matchId);
-    const pts = match?.status === 'finished' ? calcPoints(scoreHome, scoreAway, match.scoreHome, match.scoreAway) : null;
+    const pts = match?.status === 'finished' ? calcPoints(scoreHome, scoreAway, match.scoreHome, match.scoreAway, match.club) : null;
     const next = { ...pronos, [pronoKey]: { pseudo: currentUser.pseudo, matchId, scoreHome, scoreAway, points: pts, updatedAt: new Date().toISOString() } };
     await savePronos(next);
     showToast('Pronostic enregistré !');
@@ -1204,11 +1232,12 @@ function CrocoProno({ isAdmin }) {
 
   // Admin : saisir le score réel
   const setScore = async (matchId, scoreHome, scoreAway) => {
+    const match = matches.find(m => m.id === matchId);
     const updatedMatches = matches.map(m => m.id === matchId ? { ...m, scoreHome, scoreAway, status: 'finished' } : m);
     const updatedPronos = { ...pronos };
     Object.keys(updatedPronos).forEach(k => {
       if (updatedPronos[k].matchId === matchId) {
-        updatedPronos[k].points = calcPoints(updatedPronos[k].scoreHome, updatedPronos[k].scoreAway, scoreHome, scoreAway);
+        updatedPronos[k].points = calcPoints(updatedPronos[k].scoreHome, updatedPronos[k].scoreAway, scoreHome, scoreAway, match?.club);
       }
     });
     await saveMatches(updatedMatches);
@@ -1315,8 +1344,9 @@ function CrocoProno({ isAdmin }) {
               </tbody>
             </table>
           )}
-          <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 16, textAlign: "center" }}>
-            🎯 Score exact = 3pts &nbsp;|&nbsp; ✓ Bon résultat = 1pt
+          <div className="mono" style={{ fontSize: 11, color: "#8A8375", marginTop: 16, textAlign: "center", lineHeight: 1.8 }}>
+            🎯 Score exact NO = 3pts &nbsp;|&nbsp; ✓ Bon résultat NO = 1pt<br/>
+            🎯 Score exact USAM = 5pts &nbsp;|&nbsp; ✓ Bon résultat USAM = 2pts
           </div>
         </div>
       )}
@@ -1404,8 +1434,8 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
               <>
                 <div className="oswald" style={{ fontSize: 20, fontWeight: 700 }}>{myProno.scoreHome} - {myProno.scoreAway}</div>
                 {pts !== null && (
-                  <div className="oswald" style={{ fontSize: 13, background: pts === 3 ? GREEN : pts === 1 ? "#B8860B" : "#E7E3D8", color: pts > 0 ? WHITE : "#8A8375", padding: "3px 10px", borderRadius: 20, fontWeight: 700 }}>
-                    {pts === 3 ? "🎯 3 pts" : pts === 1 ? "✓ 1 pt" : "0 pt"}
+                  <div className="oswald" style={{ fontSize: 13, background: pts >= 3 ? GREEN : pts > 0 ? "#B8860B" : "#E7E3D8", color: pts > 0 ? WHITE : "#8A8375", padding: "3px 10px", borderRadius: 20, fontWeight: 700 }}>
+                    {pts >= 3 ? `🎯 ${pts} pts` : pts > 0 ? `✓ ${pts} pt${pts > 1 ? 's' : ''}` : "0 pt"}
                   </div>
                 )}
               </>
@@ -1418,10 +1448,10 @@ function MatchCard({ match, myProno, closed, currentUser, onSave }) {
           <>
             <div className="mono" style={{ fontSize: 11, color: "#6B6456", whiteSpace: "nowrap" }}>Ton prono :</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="number" min={0} max={20} value={home} onChange={e => setHome(e.target.value)}
+              <input type="number" min={0} max={99} value={home} onChange={e => setHome(e.target.value)}
                 style={{ width: 48, textAlign: "center", border: "1px solid #D8D2C2", borderRadius: 4, padding: "6px", fontSize: 16, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: INK }} />
               <span className="oswald" style={{ fontWeight: 700 }}>-</span>
-              <input type="number" min={0} max={20} value={away} onChange={e => setAway(e.target.value)}
+              <input type="number" min={0} max={99} value={away} onChange={e => setAway(e.target.value)}
                 style={{ width: 48, textAlign: "center", border: "1px solid #D8D2C2", borderRadius: 4, padding: "6px", fontSize: 16, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: INK }} />
               <button onClick={handleSave} disabled={saving || home === '' || away === ''} className="oswald"
                 style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "7px 14px", fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", opacity: home === '' || away === '' ? 0.5 : 1 }}>
@@ -1518,10 +1548,10 @@ function AdminCroco({ matches, pronos, onAddMatch, onSetScore, onDeleteMatch, on
                 <div className="oswald" style={{ fontSize: 16, fontWeight: 700, color: GREEN }}>✓ {m.scoreHome} - {m.scoreAway}</div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <input type="number" min={0} max={20} placeholder="D" value={scoreForm[m.id]?.h ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], h: e.target.value } }))}
+                  <input type="number" min={0} max={99} placeholder="D" value={scoreForm[m.id]?.h ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], h: e.target.value } }))}
                     style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
                   <span className="oswald">-</span>
-                  <input type="number" min={0} max={20} placeholder="E" value={scoreForm[m.id]?.a ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], a: e.target.value } }))}
+                  <input type="number" min={0} max={99} placeholder="E" value={scoreForm[m.id]?.a ?? ''} onChange={e => setScoreForm(f => ({ ...f, [m.id]: { ...f[m.id], a: e.target.value } }))}
                     style={{ ...inputS, width: 44, textAlign: "center", padding: "5px" }} />
                   <button onClick={() => onSetScore(m.id, parseInt(scoreForm[m.id]?.h || 0), parseInt(scoreForm[m.id]?.a || 0))} className="oswald"
                     style={{ background: RED, color: WHITE, border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
