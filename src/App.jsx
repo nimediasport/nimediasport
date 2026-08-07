@@ -25,7 +25,15 @@ const LOGO_SRC = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQ
 
 const STORAGE_KEY = "nimediasport-articles";
 const PENDING_KEY  = "nimediasport-pending";
-const ADMIN_PASS   = "NMSport26";
+const ADMIN_HASH = import.meta.env.VITE_ADMIN_HASH || "2f70f7a44ede269affabb517aee58045bc31e0c6f86b25fc3332eb89a2130d94";
+
+async function hashAdminInput(input) {
+  const text = `${input.trim()}:nimediasport`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
 const MATCHES_KEY  = "crocoprono-matches";
 const USERS_KEY    = "crocoprono-users";
 const PRONOS_KEY   = "crocoprono-pronostics";
@@ -218,8 +226,9 @@ export default function App() {
     setTimeout(() => setToast(""), 2500);
   };
 
-  const handleAdminLogin = () => {
-    if (loginInput.trim() === ADMIN_PASS) {
+  const handleAdminLogin = async () => {
+    const hash = await hashAdminInput(loginInput);
+    if (hash === ADMIN_HASH) {
       setIsAdmin(true); setShowLogin(false); setLoginError(false);
       setView("redaction");
     } else { setLoginError(true); }
